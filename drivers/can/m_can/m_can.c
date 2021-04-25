@@ -1708,21 +1708,21 @@ void m_can_init_ram(struct m_can_classdev *cdev)
 }
 EXPORT_SYMBOL_GPL(m_can_init_ram);
 
-int m_can_class_get_clocks(struct m_can_classdev *m_can_dev)
-{
-	int ret = 0;
+// int m_can_class_get_clocks(struct m_can_classdev *m_can_dev)
+// {
+// 	int ret = 0;
 
-	m_can_dev->hclk = devm_clk_get(m_can_dev->dev, "hclk");
-	m_can_dev->cclk = devm_clk_get(m_can_dev->dev, "cclk");
+// 	m_can_dev->hclk = devm_clk_get(m_can_dev->dev, "hclk");
+// 	m_can_dev->cclk = devm_clk_get(m_can_dev->dev, "cclk");
 
-	if (IS_ERR(m_can_dev->cclk)) {
-		dev_err(m_can_dev->dev, "no clock found\n");
-		ret = -ENODEV;
-	}
+// 	if (IS_ERR(m_can_dev->cclk)) {
+// 		dev_err(m_can_dev->dev, "no clock found\n");
+// 		ret = -ENODEV;
+// 	}
 
-	return ret;
-}
-EXPORT_SYMBOL_GPL(m_can_class_get_clocks);
+// 	return ret;
+// }
+// EXPORT_SYMBOL_GPL(m_can_class_get_clocks);
 
 struct m_can_classdev *m_can_class_allocate_dev(struct device *dev)
 {

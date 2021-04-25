@@ -5,8 +5,10 @@
 //
 // Copyright (C) 2018-19 Texas Instruments Incorporated - http://www.ti.com/
 
-#include <linux/platform_device.h>
-
+#include <common.h>
+#include <clk.h>
+#include <dm.h>
+#include <dm/device.h>
 #include "m_can.h"
 
 struct m_can_plat_priv {
@@ -53,7 +55,7 @@ static struct m_can_ops m_can_plat_ops = {
 	.read_fifo = iomap_read_fifo,
 };
 
-static int m_can_plat_probe(struct platform_device *pdev)
+static int m_can_plat_probe(struct udevice *dev)
 {
 	struct m_can_classdev *mcan_class;
 	struct m_can_plat_priv *priv;
@@ -62,32 +64,50 @@ static int m_can_plat_probe(struct platform_device *pdev)
 	void __iomem *mram_addr;
 	int irq, ret = 0;
 
-	mcan_class = m_can_class_allocate_dev(&pdev->dev);
-	if (!mcan_class)
-		return -ENOMEM;
-
-	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-	if (!priv)
-		return -ENOMEM;
-
-	mcan_class->device_data = priv;
-
-	m_can_class_get_clocks(mcan_class);
-
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "m_can");
-	addr = devm_ioremap_resource(&pdev->dev, res);
-	irq = platform_get_irq_byname(pdev, "int0");
-	if (IS_ERR(addr) || irq < 0) {
+	addr = dev_read_addr(dev);
+	if(addr == FDT_ADDR_T_NONE) {
 		ret = -EINVAL;
 		goto failed_ret;
 	}
 
-	/* message ram could be shared */
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "message_ram");
-	if (!res) {
+	mcan_class = dev_get_priv(dev);
+	if (!mcan_class) {
+		ret = -ENOMEM;
+		goto failed_ret;
+	}
+	
+	// priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+	priv = malloc(sizeof(m_can_plat_priv));
+	if (!priv) {
+		ret = -ENOMEM;
+		goto failed_ret;
+	}
+
+	mcan_class->device_data = priv;
+
+	// m_can_class_get_clocks(mcan_class);
+	clk_get_by_index(dev, 0, mcan_class->hclk);	
+	clk_get_by_index(dev, 1, mcan_class->cclk);
+	if (IS_ERR(mcan_class->cclk)) {
+		dev_err(mcan_class->dev, "no clock found\n");
 		ret = -ENODEV;
 		goto failed_ret;
 	}
+
+	// res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "m_can");
+	// addr = devm_ioremap_resource(&pdev->dev, res);
+	// irq = platform_get_irq_byname(pdev, "int0");
+	// if (IS_ERR(addr) || irq < 0) {
+	// 	ret = -EINVAL;
+	// 	goto failed_ret;
+	// }
+
+	/* message ram could be shared */
+	// res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "message_ram");
+	// if (!res) {
+	// 	ret = -ENODEV;
+	// 	goto failed_ret;
+	// }
 
 	mram_addr = devm_ioremap(&pdev->dev, res->start, resource_size(res));
 	if (!mram_addr) {
@@ -175,25 +195,41 @@ static const struct dev_pm_ops m_can_pmops = {
 	SET_SYSTEM_SLEEP_PM_OPS(m_can_suspend, m_can_resume)
 };
 
-static const struct of_device_id m_can_of_table[] = {
-	{ .compatible = "bosch,m_can", .data = NULL },
-	{ /* sentinel */ },
-};
-MODULE_DEVICE_TABLE(of, m_can_of_table);
+// static const struct of_device_id m_can_of_table[] = {
+// 	{ .compatible = "bosch,m_can", .data = NULL },
+// 	{ /* sentinel */ },
+// };
+// MODULE_DEVICE_TABLE(of, m_can_of_table);
 
-static struct platform_driver m_can_plat_driver = {
-	.driver = {
-		.name = KBUILD_MODNAME,
-		.of_match_table = m_can_of_table,
-		.pm     = &m_can_pmops,
-	},
+static const struct udevice_id m_can_of_table[] = {
+	{ .compatible = "bosch,m_can", .data = NULL },
+	{}
+};
+
+// static struct platform_driver m_can_plat_driver = {
+// 	.driver = {
+// 		.name = KBUILD_MODNAME,
+// 		.of_match_table = m_can_of_table,
+// 		.pm     = &m_can_pmops,
+// 	},
+// 	.probe = m_can_plat_probe,
+// 	.remove = m_can_plat_remove,
+// };
+
+// module_platform_driver(m_can);
+
+U_BOOT_DRIVER(m_can) = {
+	.name = "m_can",
+	.id = UCLASS_CAN,
+	.of_match = m_can_of_table,
+	.ofdata_to_platdata = ,
 	.probe = m_can_plat_probe,
 	.remove = m_can_plat_remove,
+	.priv_auto_alloc_size = sizeof(struct m_can_classdev),
+	.ops = &,
 };
 
-module_platform_driver(m_can_plat_driver);
-
-MODULE_AUTHOR("Dong Aisheng <b29396@freescale.com>");
-MODULE_AUTHOR("Dan Murphy <dmurphy@ti.com>");
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("M_CAN driver for IO Mapped Bosch controllers");
+// MODULE_AUTHOR("Dong Aisheng <b29396@freescale.com>");
+// MODULE_AUTHOR("Dan Murphy <dmurphy@ti.com>");
+// MODULE_LICENSE("GPL v2");
+// MODULE_DESCRIPTION("M_CAN driver for IO Mapped Bosch controllers");
