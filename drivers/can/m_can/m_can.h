@@ -70,16 +70,16 @@ struct m_can_ops {
 };
 
 struct m_can_classdev {
-	struct can_priv can;
-	struct napi_struct napi;
-	struct net_device *net;
-	struct device *dev;
+	// struct can_priv can;
+	// struct napi_struct napi;
+	// struct net_device *net;
+	// struct device *dev;
 	struct clk *hclk;
 	struct clk *cclk;
 
-	struct workqueue_struct *tx_wq;
-	struct work_struct tx_work;
-	struct sk_buff *tx_skb;
+	// struct workqueue_struct *tx_wq;
+	// struct work_struct tx_work;
+	// struct sk_buff *tx_skb;
 
 	struct can_bittiming_const *bit_timing;
 	struct can_bittiming_const *data_timing;

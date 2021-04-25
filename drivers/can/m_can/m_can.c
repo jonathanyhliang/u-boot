@@ -322,13 +322,17 @@ enum m_can_reg {
 
 static inline u32 m_can_read(struct m_can_classdev *cdev, enum m_can_reg reg)
 {
-	return cdev->ops->read_reg(cdev, reg);
+	// return cdev->ops->read_reg(cdev, reg);
+	u32 *offset = ;
+	return readl(offset + reg);
 }
 
 static inline void m_can_write(struct m_can_classdev *cdev, enum m_can_reg reg,
 			       u32 val)
 {
-	cdev->ops->write_reg(cdev, reg, val);
+	// cdev->ops->write_reg(cdev, reg, val);
+	u32 *offset = ;
+	writel(val, offset + reg);
 }
 
 static u32 m_can_fifo_read(struct m_can_classdev *cdev,
@@ -417,29 +421,29 @@ static inline void m_can_disable_all_interrupts(struct m_can_classdev *cdev)
 	m_can_write(cdev, M_CAN_ILE, 0x0);
 }
 
-static void m_can_clean(struct net_device *net)
+// static void m_can_clean(struct net_device *net)
+// {
+// 	struct m_can_classdev *cdev = netdev_priv(net);
+
+// 	if (cdev->tx_skb) {
+// 		int putidx = 0;
+
+// 		net->stats.tx_errors++;
+// 		if (cdev->version > 30)
+// 			putidx = ((m_can_read(cdev, M_CAN_TXFQS) &
+// 				   TXFQS_TFQPI_MASK) >> TXFQS_TFQPI_SHIFT);
+
+// 		can_free_echo_skb(cdev->net, putidx);
+// 		cdev->tx_skb = NULL;
+// 	}
+// }
+
+static canfd_frame *m_can_read_fifo(struct m_can_classdev *cdev, u32 rxfs)
 {
-	struct m_can_classdev *cdev = netdev_priv(net);
-
-	if (cdev->tx_skb) {
-		int putidx = 0;
-
-		net->stats.tx_errors++;
-		if (cdev->version > 30)
-			putidx = ((m_can_read(cdev, M_CAN_TXFQS) &
-				   TXFQS_TFQPI_MASK) >> TXFQS_TFQPI_SHIFT);
-
-		can_free_echo_skb(cdev->net, putidx);
-		cdev->tx_skb = NULL;
-	}
-}
-
-static void m_can_read_fifo(struct net_device *dev, u32 rxfs)
-{
-	struct net_device_stats *stats = &dev->stats;
-	struct m_can_classdev *cdev = netdev_priv(dev);
-	struct canfd_frame *cf;
-	struct sk_buff *skb;
+	// struct net_device_stats *stats = &dev->stats;
+	// struct m_can_classdev *cdev = netdev_priv(dev);
+	struct canfd_frame cf;
+	// struct sk_buff *skb;
 	u32 id, fgi, dlc;
 	int i;
 
@@ -447,38 +451,38 @@ static void m_can_read_fifo(struct net_device *dev, u32 rxfs)
 	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_SHIFT;
 	dlc = m_can_fifo_read(cdev, fgi, M_CAN_FIFO_DLC);
 	if (dlc & RX_BUF_FDF)
-		skb = alloc_canfd_skb(dev, &cf);
+		// skb = alloc_canfd_skb(dev, &cf);
 	else
-		skb = alloc_can_skb(dev, (struct can_frame **)&cf);
-	if (!skb) {
-		stats->rx_dropped++;
-		return;
-	}
+		// skb = alloc_can_skb(dev, (struct can_frame **)&cf);
+	// if (!skb) {
+	// 	stats->rx_dropped++;
+	// 	return;
+	// }
 
 	if (dlc & RX_BUF_FDF)
-		cf->len = can_dlc2len((dlc >> 16) & 0x0F);
+		cf.len = can_dlc2len((dlc >> 16) & 0x0F);
 	else
-		cf->len = get_can_dlc((dlc >> 16) & 0x0F);
+		cf.len = get_can_dlc((dlc >> 16) & 0x0F);
 
 	id = m_can_fifo_read(cdev, fgi, M_CAN_FIFO_ID);
 	if (id & RX_BUF_XTD)
-		cf->can_id = (id & CAN_EFF_MASK) | CAN_EFF_FLAG;
+		cf.can_id = (id & CAN_EFF_MASK) | CAN_EFF_FLAG;
 	else
-		cf->can_id = (id >> 18) & CAN_SFF_MASK;
+		cf.can_id = (id >> 18) & CAN_SFF_MASK;
 
 	if (id & RX_BUF_ESI) {
-		cf->flags |= CANFD_ESI;
+		cf.flags |= CANFD_ESI;
 		netdev_dbg(dev, "ESI Error\n");
 	}
 
 	if (!(dlc & RX_BUF_FDF) && (id & RX_BUF_RTR)) {
-		cf->can_id |= CAN_RTR_FLAG;
+		cf.can_id |= CAN_RTR_FLAG;
 	} else {
 		if (dlc & RX_BUF_BRS)
-			cf->flags |= CANFD_BRS;
+			cf.flags |= CANFD_BRS;
 
-		for (i = 0; i < cf->len; i += 4)
-			*(u32 *)(cf->data + i) =
+		for (i = 0; i < cf.len; i += 4)
+			*(u32 *)(cf.data + i) =
 				m_can_fifo_read(cdev, fgi,
 						M_CAN_FIFO_DATA(i / 4));
 	}
@@ -486,15 +490,16 @@ static void m_can_read_fifo(struct net_device *dev, u32 rxfs)
 	/* acknowledge rx fifo 0 */
 	m_can_write(cdev, M_CAN_RXF0A, fgi);
 
-	stats->rx_packets++;
-	stats->rx_bytes += cf->len;
+	// stats->rx_packets++;
+	// stats->rx_bytes += cf->len;
 
-	netif_receive_skb(skb);
+	// netif_receive_skb(skb);
+
 }
 
-static int m_can_do_rx_poll(struct net_device *dev, int quota)
+static int m_can_do_rx_poll(struct m_can_classdev *cdev, int quota)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct m_can_classdev *cdev = netdev_priv(dev);
 	u32 pkts = 0;
 	u32 rxfs;
 
@@ -508,7 +513,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
 		if (rxfs & RXFS_RFL)
 			netdev_warn(dev, "Rx FIFO 0 Message Lost\n");
 
-		m_can_read_fifo(dev, rxfs);
+		m_can_read_fifo(cdev, rxfs);
 
 		quota--;
 		pkts++;
@@ -516,7 +521,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
 	}
 
 	if (pkts)
-		can_led_event(dev, CAN_LED_EVENT_RX);
+		can_led_event(cdev, CAN_LED_EVENT_RX);
 
 	return pkts;
 }
@@ -544,64 +549,64 @@ static int m_can_handle_lost_msg(struct net_device *dev)
 	return 1;
 }
 
-static int m_can_handle_lec_err(struct net_device *dev,
+static int m_can_handle_lec_err(struct m_can_classdev *cdev,
 				enum m_can_lec_type lec_type)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
-	struct net_device_stats *stats = &dev->stats;
-	struct can_frame *cf;
-	struct sk_buff *skb;
+	// struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct net_device_stats *stats = &dev->stats;
+	struct can_frame cf;
+	// struct sk_buff *skb;
 
 	cdev->can.can_stats.bus_error++;
-	stats->rx_errors++;
+	// stats->rx_errors++;
 
 	/* propagate the error condition to the CAN stack */
-	skb = alloc_can_err_skb(dev, &cf);
-	if (unlikely(!skb))
-		return 0;
+	// skb = alloc_can_err_skb(dev, &cf);
+	// if (unlikely(!skb))
+	// 	return 0;
 
 	/* check for 'last error code' which tells us the
 	 * type of the last error to occur on the CAN bus
 	 */
-	cf->can_id |= CAN_ERR_PROT | CAN_ERR_BUSERROR;
+	cf.can_id |= CAN_ERR_PROT | CAN_ERR_BUSERROR;
 
 	switch (lec_type) {
 	case LEC_STUFF_ERROR:
 		netdev_dbg(dev, "stuff error\n");
-		cf->data[2] |= CAN_ERR_PROT_STUFF;
+		cf.data[2] |= CAN_ERR_PROT_STUFF;
 		break;
 	case LEC_FORM_ERROR:
 		netdev_dbg(dev, "form error\n");
-		cf->data[2] |= CAN_ERR_PROT_FORM;
+		cf.data[2] |= CAN_ERR_PROT_FORM;
 		break;
 	case LEC_ACK_ERROR:
 		netdev_dbg(dev, "ack error\n");
-		cf->data[3] = CAN_ERR_PROT_LOC_ACK;
+		cf.data[3] = CAN_ERR_PROT_LOC_ACK;
 		break;
 	case LEC_BIT1_ERROR:
 		netdev_dbg(dev, "bit1 error\n");
-		cf->data[2] |= CAN_ERR_PROT_BIT1;
+		cf.data[2] |= CAN_ERR_PROT_BIT1;
 		break;
 	case LEC_BIT0_ERROR:
 		netdev_dbg(dev, "bit0 error\n");
-		cf->data[2] |= CAN_ERR_PROT_BIT0;
+		cf.data[2] |= CAN_ERR_PROT_BIT0;
 		break;
 	case LEC_CRC_ERROR:
 		netdev_dbg(dev, "CRC error\n");
-		cf->data[3] = CAN_ERR_PROT_LOC_CRC_SEQ;
+		cf.data[3] = CAN_ERR_PROT_LOC_CRC_SEQ;
 		break;
 	default:
 		break;
 	}
 
-	stats->rx_packets++;
-	stats->rx_bytes += cf->can_dlc;
-	netif_receive_skb(skb);
+	// stats->rx_packets++;
+	// stats->rx_bytes += cf->can_dlc;
+	// netif_receive_skb(skb);
 
 	return 1;
 }
 
-static int __m_can_get_berr_counter(const struct net_device *dev,
+static int __m_can_get_berr_counter(const struct m_can_classdev *cdev,
 				    struct can_berr_counter *bec)
 {
 	struct m_can_classdev *cdev = netdev_priv(dev);
@@ -636,30 +641,30 @@ static void m_can_clk_stop(struct m_can_classdev *cdev)
 		pm_runtime_put_sync(cdev->dev);
 }
 
-static int m_can_get_berr_counter(const struct net_device *dev,
+static int m_can_get_berr_counter(const struct m_can_classdev *cdev,
 				  struct can_berr_counter *bec)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct m_can_classdev *cdev = netdev_priv(dev);
 	int err;
 
 	err = m_can_clk_start(cdev);
 	if (err)
 		return err;
 
-	__m_can_get_berr_counter(dev, bec);
+	__m_can_get_berr_counter(cdev, bec);
 
 	m_can_clk_stop(cdev);
 
 	return 0;
 }
 
-static int m_can_handle_state_change(struct net_device *dev,
+static int m_can_handle_state_change(struct m_can_classdev *cdev,
 				     enum can_state new_state)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
-	struct net_device_stats *stats = &dev->stats;
-	struct can_frame *cf;
-	struct sk_buff *skb;
+	// struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct net_device_stats *stats = &dev->stats;
+	struct can_frame cf;
+	// struct sk_buff *skb;
 	struct can_berr_counter bec;
 	unsigned int ecr;
 
@@ -679,58 +684,58 @@ static int m_can_handle_state_change(struct net_device *dev,
 		cdev->can.state = CAN_STATE_BUS_OFF;
 		m_can_disable_all_interrupts(cdev);
 		cdev->can.can_stats.bus_off++;
-		can_bus_off(dev);
+		can_bus_off(cdev);
 		break;
 	default:
 		break;
 	}
 
 	/* propagate the error condition to the CAN stack */
-	skb = alloc_can_err_skb(dev, &cf);
-	if (unlikely(!skb))
-		return 0;
+	// skb = alloc_can_err_skb(dev, &cf);
+	// if (unlikely(!skb))
+	// 	return 0;
 
-	__m_can_get_berr_counter(dev, &bec);
+	__m_can_get_berr_counter(cdev, &bec);
 
 	switch (new_state) {
 	case CAN_STATE_ERROR_ACTIVE:
 		/* error warning state */
-		cf->can_id |= CAN_ERR_CRTL;
-		cf->data[1] = (bec.txerr > bec.rxerr) ?
+		cf.can_id |= CAN_ERR_CRTL;
+		cf.data[1] = (bec.txerr > bec.rxerr) ?
 			CAN_ERR_CRTL_TX_WARNING :
 			CAN_ERR_CRTL_RX_WARNING;
-		cf->data[6] = bec.txerr;
-		cf->data[7] = bec.rxerr;
+		cf.data[6] = bec.txerr;
+		cf.data[7] = bec.rxerr;
 		break;
 	case CAN_STATE_ERROR_PASSIVE:
 		/* error passive state */
-		cf->can_id |= CAN_ERR_CRTL;
+		cf.can_id |= CAN_ERR_CRTL;
 		ecr = m_can_read(cdev, M_CAN_ECR);
 		if (ecr & ECR_RP)
-			cf->data[1] |= CAN_ERR_CRTL_RX_PASSIVE;
+			cf.data[1] |= CAN_ERR_CRTL_RX_PASSIVE;
 		if (bec.txerr > 127)
-			cf->data[1] |= CAN_ERR_CRTL_TX_PASSIVE;
-		cf->data[6] = bec.txerr;
-		cf->data[7] = bec.rxerr;
+			cf.data[1] |= CAN_ERR_CRTL_TX_PASSIVE;
+		cf.data[6] = bec.txerr;
+		cf.data[7] = bec.rxerr;
 		break;
 	case CAN_STATE_BUS_OFF:
 		/* bus-off state */
-		cf->can_id |= CAN_ERR_BUSOFF;
+		cf.can_id |= CAN_ERR_BUSOFF;
 		break;
 	default:
 		break;
 	}
 
-	stats->rx_packets++;
-	stats->rx_bytes += cf->can_dlc;
-	netif_receive_skb(skb);
+	// stats->rx_packets++;
+	// stats->rx_bytes += cf->can_dlc;
+	// netif_receive_skb(skb);
 
 	return 1;
 }
 
-static int m_can_handle_state_errors(struct net_device *dev, u32 psr)
+static int m_can_handle_state_errors(struct m_can_classdev *cdev, u32 psr)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct m_can_classdev *cdev = netdev_priv(dev);
 	int work_done = 0;
 
 	if (psr & PSR_EW && cdev->can.state != CAN_STATE_ERROR_WARNING) {
@@ -777,10 +782,10 @@ static inline bool is_lec_err(u32 psr)
 	return psr && (psr != LEC_UNUSED);
 }
 
-static int m_can_handle_bus_errors(struct net_device *dev, u32 irqstatus,
+static int m_can_handle_bus_errors(struct m_can_classdev *cdev, u32 irqstatus,
 				   u32 psr)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct m_can_classdev *cdev = netdev_priv(dev);
 	int work_done = 0;
 
 	if (irqstatus & IR_RF0L)
@@ -789,7 +794,7 @@ static int m_can_handle_bus_errors(struct net_device *dev, u32 irqstatus,
 	/* handle lec errors on the bus */
 	if ((cdev->can.ctrlmode & CAN_CTRLMODE_BERR_REPORTING) &&
 	    is_lec_err(psr))
-		work_done += m_can_handle_lec_err(dev, psr & LEC_UNUSED);
+		work_done += m_can_handle_lec_err(cdev, psr & LEC_UNUSED);
 
 	/* other unproccessed error interrupts */
 	m_can_handle_other_err(dev, irqstatus);
@@ -797,9 +802,9 @@ static int m_can_handle_bus_errors(struct net_device *dev, u32 irqstatus,
 	return work_done;
 }
 
-static int m_can_rx_handler(struct net_device *dev, int quota)
+static int m_can_rx_handler(struct m_can_classdev *cdev, int quota)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct m_can_classdev *cdev = netdev_priv(dev);
 	int work_done = 0;
 	u32 irqstatus, psr;
 
@@ -831,22 +836,22 @@ static int m_can_rx_handler(struct net_device *dev, int quota)
 	psr = m_can_read(cdev, M_CAN_PSR);
 
 	if (irqstatus & IR_ERR_STATE)
-		work_done += m_can_handle_state_errors(dev, psr);
+		work_done += m_can_handle_state_errors(cdev, psr);
 
 	if (irqstatus & IR_ERR_BUS_30X)
-		work_done += m_can_handle_bus_errors(dev, irqstatus, psr);
+		work_done += m_can_handle_bus_errors(cdev, irqstatus, psr);
 
 	if (irqstatus & IR_RF0N)
-		work_done += m_can_do_rx_poll(dev, (quota - work_done));
+		work_done += m_can_do_rx_poll(cdev, (quota - work_done));
 end:
 	return work_done;
 }
 
-static int m_can_rx_peripheral(struct net_device *dev)
+static int m_can_rx_peripheral(struct m_can_classdev *cdev)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct m_can_classdev *cdev = netdev_priv(dev);
 
-	m_can_rx_handler(dev, 1);
+	m_can_rx_handler(cdev, 1);
 
 	m_can_enable_all_interrupts(cdev);
 
@@ -868,7 +873,7 @@ static int m_can_poll(struct napi_struct *napi, int quota)
 	return work_done;
 }
 
-static void m_can_echo_tx_event(struct net_device *dev)
+static void m_can_echo_tx_event(struct m_can_classdev *cdev)
 {
 	u32 txe_count = 0;
 	u32 m_can_txefs;
@@ -876,8 +881,8 @@ static void m_can_echo_tx_event(struct net_device *dev)
 	int i = 0;
 	unsigned int msg_mark;
 
-	struct m_can_classdev *cdev = netdev_priv(dev);
-	struct net_device_stats *stats = &dev->stats;
+	// struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct net_device_stats *stats = &dev->stats;
 
 	/* read tx event fifo status */
 	m_can_txefs = m_can_read(cdev, M_CAN_TXEFS);
@@ -901,8 +906,8 @@ static void m_can_echo_tx_event(struct net_device *dev)
 						(fgi << TXEFA_EFAI_SHIFT)));
 
 		/* update stats */
-		stats->tx_bytes += can_get_echo_skb(dev, msg_mark);
-		stats->tx_packets++;
+		// stats->tx_bytes += can_get_echo_skb(dev, msg_mark);
+		// stats->tx_packets++;
 	}
 }
 
@@ -1008,9 +1013,9 @@ static const struct can_bittiming_const m_can_data_bittiming_const_31X = {
 	.brp_inc = 1,
 };
 
-static int m_can_set_bittiming(struct net_device *dev)
+static int m_can_set_bittiming(struct m_can_classdev *cdev)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct m_can_classdev *cdev = netdev_priv(dev);
 	const struct can_bittiming *bt = &cdev->can.bittiming;
 	const struct can_bittiming *dbt = &cdev->can.data_bittiming;
 	u16 brp, sjw, tseg1, tseg2;
@@ -1081,9 +1086,9 @@ static int m_can_set_bittiming(struct net_device *dev)
  * - configure mode
  * - setup bittiming
  */
-static void m_can_chip_config(struct net_device *dev)
+static void m_can_chip_config(struct m_can_classdev *cdev)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct m_can_classdev *cdev = netdev_priv(dev);
 	u32 cccr, test;
 
 	m_can_config_endisable(cdev, true);
@@ -1193,24 +1198,24 @@ static void m_can_chip_config(struct net_device *dev)
 		cdev->ops->init(cdev);
 }
 
-static void m_can_start(struct net_device *dev)
+static void m_can_start(struct m_can_classdev *cdev)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct m_can_classdev *cdev = netdev_priv(dev);
 
 	/* basic m_can configuration */
-	m_can_chip_config(dev);
+	m_can_chip_config(cdev);
 
 	cdev->can.state = CAN_STATE_ERROR_ACTIVE;
 
 	m_can_enable_all_interrupts(cdev);
 }
 
-static int m_can_set_mode(struct net_device *dev, enum can_mode mode)
+static int m_can_set_mode(struct m_can_classdev *cdev, enum can_mode mode)
 {
 	switch (mode) {
 	case CAN_MODE_START:
-		m_can_clean(dev);
-		m_can_start(dev);
+		m_can_clean(cdev);
+		m_can_start(cdev);
 		netif_wake_queue(dev);
 		break;
 	default:
@@ -1359,9 +1364,9 @@ static int m_can_dev_setup(struct m_can_classdev *m_can_dev)
 	return 0;
 }
 
-static void m_can_stop(struct net_device *dev)
+static void m_can_stop(struct m_can_classdev *cdev)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct m_can_classdev *cdev = netdev_priv(dev);
 
 	/* disable all interrupts */
 	m_can_disable_all_interrupts(cdev);
@@ -1370,16 +1375,16 @@ static void m_can_stop(struct net_device *dev)
 	cdev->can.state = CAN_STATE_STOPPED;
 }
 
-static int m_can_close(struct net_device *dev)
+static int m_can_close(struct m_can_classdev *cdev)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct m_can_classdev *cdev = netdev_priv(dev);
 
 	netif_stop_queue(dev);
 
 	if (!cdev->is_peripheral)
 		napi_disable(&cdev->napi);
 
-	m_can_stop(dev);
+	m_can_stop(cdev);
 	m_can_clk_stop(cdev);
 	free_irq(dev->irq, dev);
 
@@ -1395,9 +1400,9 @@ static int m_can_close(struct net_device *dev)
 	return 0;
 }
 
-static int m_can_next_echo_skb_occupied(struct net_device *dev, int putidx)
+static int m_can_next_echo_skb_occupied(struct m_can_classdev *cdev, int putidx)
 {
-	struct m_can_classdev *cdev = netdev_priv(dev);
+	// struct m_can_classdev *cdev = netdev_priv(dev);
 	/*get wrap around for loopback skb index */
 	unsigned int wrap = cdev->can.echo_skb_max;
 	int next_idx;
