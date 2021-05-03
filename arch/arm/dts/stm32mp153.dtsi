@@ -33,7 +33,7 @@
 			clocks = <&rcc CK_HSE>, <&rcc FDCAN_K>;
 			clock-names = "hclk", "cclk";
 			bosch,mram-cfg = <0x0 0 0 32 0 0 2 2>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		m_can2: can@4400f000 {

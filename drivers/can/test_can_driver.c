@@ -37,13 +37,13 @@ static int can_probe(struct udevice *dev)
 
 static const struct udevice_id can_of_match[] = {
     { .compatible = "bosch,m_can" },
-    { }
+    {}
 };
 
-U_BOOT_DRIVER(can_drv) = {
-    .name           = "can_drv",
-    .id             = "UCLASS_CAN",
-    .of_match       =  can_of_match,
+U_BOOT_DRIVER(can_drv_emul) = {
+    .name           = "can_drv_emul",
+    .id             = UCLASS_CAN_EMUL,
+    .of_match       = can_of_match,
     .of_to_plat     = can_of_to_plat,
     .probe          = can_probe,
     .plat_auto      = sizeof(struct can_plat);
