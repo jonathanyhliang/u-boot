@@ -29,7 +29,6 @@ enum uclass_id {
 	UCLASS_PCI_EMUL_PARENT,	/* parent for PCI device emulators */
 	UCLASS_USB_EMUL,	/* sandbox USB bus device emulator */
 	UCLASS_AXI_EMUL,	/* sandbox AXI bus device emulator */
-	UCLASS_CAN_EMUL,
 
 	/* U-Boot uclasses start here - in alphabetical order */
 	UCLASS_ACPI_PMC,	/* (x86) Power-management controller (PMC) */
@@ -129,6 +128,7 @@ enum uclass_id {
 	UCLASS_W1_EEPROM,	/* one-wire EEPROMs */
 	UCLASS_WDT,		/* Watchdog Timer driver */
 	UCLASS_PVBLOCK,		/* Xen virtual block device */
+	UCLASS_CAN_EMUL,
 
 	UCLASS_COUNT,
 	UCLASS_INVALID = -1,
