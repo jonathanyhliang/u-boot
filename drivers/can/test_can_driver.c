@@ -7,8 +7,8 @@
 #define MRAM_CFG_LEN    8
 
 struct can_priv {
-    void *base;
-    void *mram_base;
+    u32 base;
+    u32 mram_base;
     struct clk hclk;
     struct clk cclk;
     u32 mram_config_vals[MRAM_CFG_LEN];
@@ -17,7 +17,7 @@ struct can_priv {
 static int can_of_to_plat(struct udevice *dev)
 {
     struct can_priv *priv = dev_get_priv(dev);
-    void *addr;
+    fdt_addr_t addr;
     int ret;
 
     // ret = clk_get_by_name(dev, "hclk", &priv->hclk);
@@ -28,15 +28,15 @@ static int can_of_to_plat(struct udevice *dev)
 	// if (ret)
 	// 	return ret;
 
-    addr = dev_remap_addr_name(dev, "m_can");
-	if(addr)
+    addr = (int)dev_read_addr_name(dev, "m_can");
+	if (addr == FDT_ADDR_T_NONE)
 		return -EINVAL;
-	priv->base = addr;
+	priv->base = (u32)addr;
 
-    addr = dev_remap_addr_name(dev, "message_ram");
-	if(addr)
+    addr = (int)dev_read_addr_name(dev, "message_ram");
+	if (addr == FDT_ADDR_T_NONE)
 		return -EINVAL;
-	priv->mram_base = addr;
+	priv->mram_base = (u32)addr;
 
     ret = dev_read_u32_array(dev, "bosch,mram-cfg", priv->mram_config_vals, MRAM_CFG_LEN);
     if(ret)
@@ -48,9 +48,8 @@ static int can_of_to_plat(struct udevice *dev)
 static int can_probe(struct udevice *dev)
 {
     struct can_priv *priv = dev_get_priv(dev);
-    // printf("hclk: %d")
-    printf("base-reg: %d\n",*(int*)priv->base);
-    printf("mram-reg: %d\n",*(int*)priv->mram_base);
+    printf("base-reg: %x\n",priv->base);
+    printf("mram-reg: %x\n",priv->mram_base);
     printf("mram-cfg: %d %d %d %d %d %d %d %d\n",
             priv->mram_config_vals[0],
             priv->mram_config_vals[1],
