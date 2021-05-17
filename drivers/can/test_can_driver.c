@@ -1,40 +1,65 @@
 #include <common.h>
 #include <dt-structs.h>
 #include <dm/device.h>
+#include <dm/read.h>
+#include <clk.h>
 
 #define MRAM_CFG_LEN    8
 
-struct can_plat {
-#if CONFIG_IS_ENABLED(OF_PLATDATA)
-    struct dtd_can dtplat;
-#endif
+struct can_priv {
+    void *base;
+    void *mram_base;
+    struct clk hclk;
+    struct clk cclk;
     u32 mram_config_vals[MRAM_CFG_LEN];
 };
 
 static int can_of_to_plat(struct udevice *dev)
 {
-    struct can_plat *plat = dev_get_plat(dev);
-    const void *blob = gd->fdt_blob;
-    int node = dev_of_offset(dev);
-    if(fdtdec_get_int_array(blob, node, "bosch,mram-cfg", plat->mram_config_vals, MRAM_CFG_LEN)) {
-        return -EINVAL;
-    }
+    struct can_priv *priv = dev_get_priv(dev);
+    void *addr;
+    int ret;
 
+    // ret = clk_get_by_name(dev, "hclk", &priv->hclk);
+	// if (ret)
+	// 	return ret;
+
+    // ret = clk_get_by_name(dev, "cclk", &priv->cclk);
+	// if (ret)
+	// 	return ret;
+
+    addr = dev_remap_addr_name(dev, "m_can");
+	if(addr)
+		return -EINVAL;
+	priv->base = addr;
+
+    addr = dev_remap_addr_name(dev, "message_ram");
+	if(addr)
+		return -EINVAL;
+	priv->mram_base = addr;
+
+    ret = dev_read_u32_array(dev, "bosch,mram-cfg", priv->mram_config_vals, MRAM_CFG_LEN);
+    if(ret)
+        return ret;
+ 
     return 0;
 }
 
 static int can_probe(struct udevice *dev)
 {
-    struct can_plat *plat = dev_get_plat(dev);
+    struct can_priv *priv = dev_get_priv(dev);
+    // printf("hclk: %d")
+    printf("base-reg: %d\n",*(int*)priv->base);
+    printf("mram-reg: %d\n",*(int*)priv->mram_base);
     printf("mram-cfg: %d %d %d %d %d %d %d %d\n",
-            plat->mram_config_vals[0],
-            plat->mram_config_vals[1],
-            plat->mram_config_vals[2],
-            plat->mram_config_vals[3],
-            plat->mram_config_vals[4],
-            plat->mram_config_vals[5],
-            plat->mram_config_vals[6],
-            plat->mram_config_vals[7]);
+            priv->mram_config_vals[0],
+            priv->mram_config_vals[1],
+            priv->mram_config_vals[2],
+            priv->mram_config_vals[3],
+            priv->mram_config_vals[4],
+            priv->mram_config_vals[5],
+            priv->mram_config_vals[6],
+            priv->mram_config_vals[7]);
 
     return 0;
 }
@@ -50,5 +75,5 @@ U_BOOT_DRIVER(can_drv_emul) = {
     .of_match       = can_of_match,
     .of_to_plat     = can_of_to_plat,
     .probe          = can_probe,
-    .plat_auto      = sizeof(struct can_plat),
+    .priv_auto      = sizeof(struct can_priv),
 };
